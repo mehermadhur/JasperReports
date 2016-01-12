@@ -1,0 +1,50 @@
+cat source_small.json | java -jar target/TestReportSocket-1.0-SNAPSHOT-jar-with-dependencies.jar "{
+
+\"report_name\": \"RelatórioPedidos\",
+\"report_title\": \"Relatório de Pedidos\",
+\"columns\": [
+    \"Criado Em\",
+    \"Emissor\",
+    \"Tipo Pagamento\"
+],
+\"fields\": [
+    \"created\",
+    \"issuer\",
+    \"payment_type\"
+],
+\"filters\": [
+    \"Data Inicial : 23/11/2015 00:01:02\",
+    \"Data Final : 24/11/2016 01:02:03\",
+    \"Data Inicial : 23/11/2015 00:01:02\",
+    \"Data Final : 24/11/2016 01:02:03\",
+    \"Debit : Credit\",
+    \"Data Inicial : 23/11/2015 00:01:02\",
+    \"Data Final : 24/11/2016 01:02:03\",
+    \"Data Inicial : 23/11/2015 00:01:02\",
+    \"Data Final : 24/11/2016 01:02:03\",
+    \"Debit : Credit\"
+],
+\"aggs\" : [
+    {
+        \"sum\" : [
+            {\"Amount\" : \"R$ 60,00\"},
+            {\"Periods\" : \"70\"}
+        ]
+    },
+    {
+        \"groups\": [
+            {
+                \"Área1\" : {
+                    \"qtde\" : \"1000\"
+                }
+            },
+            {
+                \"Área2\" : {
+                    \"qtde\" : \"5000\",
+                    \"amount\" : \"R$ 9999,99\"
+                }
+            }
+        ]
+    }
+]
+}"
