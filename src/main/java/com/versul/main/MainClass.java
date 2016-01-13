@@ -224,19 +224,13 @@ public class MainClass {
 
         for (String extractField : filters) {
 
-            String[] separeted = extractField.split(" : ");
-            key = (String) separeted[0];
-            value = (String) separeted[1];
-
-            System.out.println("[" + cont + "]" + key + " : " + value);
-
             if (cont == 1) {
                 card1 = createCardComponent();
                 vertList1 = cmp.verticalList();
             }
 
             HorizontalListBuilder horizontalData = cmp.horizontalList();
-            horizontalData.add(cmp.text("<b>" + key + "</b> : ").setStyle(getStyleMarkedUp()), cmp.text(value));
+            horizontalData.add(cmp.text(extractField).setStyle(getStyleMarkedUp()));
 
             vertList1.add(horizontalData);
 
@@ -307,7 +301,7 @@ public class MainClass {
                         listSuper);
             }
         }
-        return null;
+        return cmp.verticalList();
     }
 
     private ComponentBuilder<?, ?> createSumComponent(String label) {
@@ -355,9 +349,8 @@ public class MainClass {
                         cmp.text(label).setStyle(templateDefault.boldStyle),
                         listSuper);
             }
-
         }
-        return null;
+        return cmp.verticalList();
     }
 
     private HorizontalListBuilder createCardComponent() {

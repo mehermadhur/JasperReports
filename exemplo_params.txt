@@ -30,21 +30,6 @@ cat source_small.json | java -jar target/TestReportSocket-1.0-SNAPSHOT-jar-with-
             {\"Amount\" : \"R$ 60,00\"},
             {\"Periods\" : \"70\"}
         ]
-    },
-    {
-        \"groups\": [
-            {
-                \"Área1\" : {
-                    \"qtde\" : \"1000\"
-                }
-            },
-            {
-                \"Área2\" : {
-                    \"qtde\" : \"5000\",
-                    \"amount\" : \"R$ 9999,99\"
-                }
-            }
-        ]
     }
 ]
 }"
