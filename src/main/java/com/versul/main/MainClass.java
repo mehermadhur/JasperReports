@@ -22,16 +22,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.sf.dynamicreports.jasper.builder.JasperReportBuilder;
 import net.sf.dynamicreports.jasper.builder.export.JasperPdfExporterBuilder;
 import net.sf.dynamicreports.report.builder.DynamicReports;
 import static net.sf.dynamicreports.report.builder.DynamicReports.cmp;
 import static net.sf.dynamicreports.report.builder.DynamicReports.col;
 import static net.sf.dynamicreports.report.builder.DynamicReports.export;
-import static net.sf.dynamicreports.report.builder.DynamicReports.hyperLink;
 import static net.sf.dynamicreports.report.builder.DynamicReports.report;
 import static net.sf.dynamicreports.report.builder.DynamicReports.stl;
 import net.sf.dynamicreports.report.builder.HyperLinkBuilder;
@@ -61,6 +57,10 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import static net.sf.dynamicreports.report.builder.DynamicReports.hyperLink;
+//import org.apache.log4j.BasicConfigurator;
+//import org.apache.log4j.Logger;
+
 
 /**
  *
@@ -73,29 +73,44 @@ public class MainClass {
     private JasperReportBuilder report = null;
     private StyleBuilder cardStyle;
     private final int MAX_FILTERS_ROWS = 10;
-
+    
     // Arguments
     private String reportName;
     private String reportTitle;
     private List<String> extractFields;
     private List<String> tableColumnName;
     private List<String> filters;
-    private List<JSONObject> aggregations;
-
+    private JSONObject aggregations;
+    
     public MainClass() {
         report = report();
         createCardStyle();
     }
 
     public static void main(String[] args) throws Exception {
-
+        
+        
         if (args == null || args.length != 1) {
             throw new IllegalArgumentException("Número de parâmetros inválido ou parâmetros não foram recebidos.");
         }
 
-        MainClass main = new MainClass();
-        main.extractAndValidateParams(args[0]);
-        main.createReport();
+//        BasicConfigurator.configure();
+        try{
+            MainClass main = new MainClass();
+            main.extractAndValidateParams(args[0]);
+            main.createReport();
+        } catch (Exception e) {
+            log(e);
+        }
+    }
+//    private static Logger logger = Logger.getLogger(MainClass.class);
+    
+    private static void log(Throwable e) throws IOException {
+//        logger.info("paaah!", e);
+    }
+    
+    private static void log(String msg) throws IOException {
+//        logger.info(msg);
     }
 
     private void extractAndValidateParams(String jsonArgs) throws ParseException {
@@ -118,7 +133,7 @@ public class MainClass {
         extractFields = (JSONArray) arguments.get("fields");
         tableColumnName = (JSONArray) arguments.get("columns");
         filters = (List) arguments.get("filters");
-        aggregations = (JSONArray) arguments.get("aggs");
+        aggregations = (JSONObject) arguments.get("aggs");
 
         if (reportName.isEmpty()) {
             throw new IllegalArgumentException("'report_name' argument is invalid");
@@ -146,12 +161,19 @@ public class MainClass {
     }
 
     private void createReport() throws SQLException, IOException, JRException, DRException {
+        log("CreatedInstance");
         reportCreateInstance();
+        log("ReceiptData");
         reportReceiptData();
+        log("Configure");
         reportConfigure();
+        log("CreateColumns");
         reportCreateColumns();
+        log("Createinfopage");
         reportCreateInfoPage();
+        log("export");
         reportExport();
+        log("done");
     }
 
     private void reportCreateInstance() {
@@ -191,7 +213,7 @@ public class MainClass {
         report.pageFooter(footerList);
     }
 
-    private void reportCreateInfoPage() throws MalformedURLException {
+    private void reportCreateInfoPage() throws MalformedURLException, IOException {
         report.title(
                 createTitleComponent(reportTitle),
                 cmp.horizontalList()
@@ -207,22 +229,21 @@ public class MainClass {
     }
 
     private void reportExport() throws DRException {
-        JasperPdfExporterBuilder pdfExporter = export.pdfExporter(reportName);
+        JasperPdfExporterBuilder pdfExporter = export.pdfExporter(System.out);
         report.toPdf(pdfExporter);
-        report.show(true);
+//        report.show(true);
     }
 
-    private ComponentBuilder<?, ?> createFiltersComponent(String label) {
-
+    private ComponentBuilder<?, ?> createFiltersComponent(String label) throws IOException {
+        
         HorizontalListBuilder superList = cmp.horizontalList();
-        String key, value;
-
         HorizontalListBuilder card1 = null;
         VerticalListBuilder vertList1 = null;
 
         int cont = 1;
 
         for (String extractField : filters) {
+            log(extractField);
 
             if (cont == 1) {
                 card1 = createCardComponent();
@@ -234,7 +255,7 @@ public class MainClass {
 
             vertList1.add(horizontalData);
 
-            if (cont == MAX_FILTERS_ROWS) {
+            if (cont == MAX_FILTERS_ROWS || cont == filters.size()) {
                 cont = 1;
 
                 card1.add(vertList1);
@@ -243,53 +264,51 @@ public class MainClass {
                 cont++;
             }
         }
-
         return cmp.verticalList(
                 cmp.text(label).setStyle(templateDefault.boldStyle),
                 superList);
     }
 
-    private ComponentBuilder<?, ?> createGroupsComponent(String label) {
-        if (aggregations != null) {
+    private ComponentBuilder<?, ?> createGroupsComponent(String label) throws IOException {
+        if (aggregations != null && aggregations.containsKey("group")) {
 
-            JSONArray groups = null;
-            String keyy;
-            for (JSONObject extractField : aggregations) {
-                keyy = (String) extractField.keySet().toArray()[0];
-
-                if (keyy.equalsIgnoreCase("groups")) {
-                    groups = (JSONArray) extractField.get(keyy);
-                    break;
-                }
-            }
+            JSONArray groups = (JSONArray) aggregations.get("group");
 
             if (groups != null) {
                 VerticalListBuilder listSuper = cmp.verticalList();
 
                 String key;
-                JSONObject groupObject;
+                JSONArray group;
 
-                for (Object sumObject : groups) {
+                for (Object groupObj : groups) {
                     HorizontalListBuilder cardComponent = createCardComponent();
-
-                    JSONObject sumField = (JSONObject) sumObject;
-
-                    key = (String) sumField.keySet().toArray()[0];
-
-                    groupObject = (JSONObject) sumField.get(key);
+                    // Aggregation object
+                    JSONObject groupField = (JSONObject) groupObj;
+                    key = (String) groupField.keySet().toArray()[0];
+                    group = (JSONArray) groupField.get(key);
 
                     VerticalListBuilder content = cmp.verticalList();
                     content.add(cmp.text(key).setStyle(templateDefault.boldStyleFont10));
 
-                    Set keySet = groupObject.keySet();
+                    for (Object segmentObj : group) {
+                        JSONObject segment = (JSONObject) segmentObj;
+                        Object[] segmentKeys = segment.keySet().toArray();
+                        for (Object statisticKey : segmentKeys) {
+                            content.add(cmp.text("   " + statisticKey.toString() + ":").setStyle(templateDefault.boldStyleFont10));
+                            JSONObject statistics = (JSONObject) segment.get(statisticKey);
+                            Object[] statisticKeys = statistics.keySet().toArray();
+                            
+                            String totalKey = statisticKeys[0].toString();
+                            String totalObject = statistics.get(totalKey).toString();
 
-                    String keyObject, valueObject;
+                            content.add(cmp.text("        <b>" + totalKey + "</b> : " + totalObject).setStyle(getStyleMarkedUp()));
 
-                    for (Object keyObj : keySet) {
-                        keyObject = keyObj.toString();
-                        valueObject = groupObject.get(keyObject).toString();
-
-                        content.add(cmp.text("    <b>" + keyObject + "</b> : " + valueObject).setStyle(getStyleMarkedUp()));
+                            if (statisticKeys.length > 1) {
+                                String amountKey = statisticKeys[1].toString();
+                                String amountObject = statistics.get(amountKey).toString();
+                                content.add(cmp.text("        <b>" + amountKey + "</b> : " + amountObject).setStyle(getStyleMarkedUp()));
+                            }
+                        }
                     }
 
                     cardComponent.add(content);
@@ -304,19 +323,10 @@ public class MainClass {
         return cmp.verticalList();
     }
 
-    private ComponentBuilder<?, ?> createSumComponent(String label) {
-        if (aggregations != null) {
+    private ComponentBuilder<?, ?> createSumComponent(String label) throws IOException {
+        if (aggregations != null && aggregations.containsKey("sum")) {
 
-            JSONArray sumArray = null;
-            String keyy;
-            for (JSONObject extractField : aggregations) {
-                keyy = (String) extractField.keySet().toArray()[0];
-
-                if (keyy.equalsIgnoreCase("sum")) {
-                    sumArray = (JSONArray) extractField.get(keyy);
-                    break;
-                }
-            }
+            JSONArray sumArray = (JSONArray) aggregations.get("sum");
 
             if (sumArray != null) {
 
@@ -331,7 +341,10 @@ public class MainClass {
                     JSONObject sumField = (JSONObject) sumObject;
 
                     key = (String) sumField.keySet().toArray()[0];
-                    value = (String) sumField.get(key);
+                    log("key " + key);
+                                       
+                    value = String.valueOf(sumField.get(key));                    
+                    log("value " + sumField.get(key));
 
                     VerticalListBuilder content = cmp.verticalList();
 
@@ -381,7 +394,7 @@ public class MainClass {
                 try {
                     Desktop.getDesktop().browse(new URI(jrph.getHyperlinkAnchor()));
                 } catch (Exception ex) {
-                    Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
+//                    Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
                 }
 
             }
@@ -446,3 +459,4 @@ public class MainClass {
         outputStream.close();
     }
 }
+
