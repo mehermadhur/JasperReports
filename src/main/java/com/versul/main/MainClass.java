@@ -215,7 +215,7 @@ public class MainClass {
         horizontalList.setStyle(stl.style(10));
         
         ComponentBuilder<?, ?> compFilters = createFiltersComponent("Filters");
-        ComponentBuilder<?, ?> compGroups = createGroupsComponent("Groups");
+        ComponentBuilder<?, ?> compGroups = createGroupsComponent("Groups (Top 10)");
         ComponentBuilder<?, ?> compSum = createSumComponent("Sum");
         
         if (compFilters != null) {
@@ -303,23 +303,29 @@ public class MainClass {
                     content.add(cmp.text(key).setStyle(templateDefault.boldStyleFont10));
 
                     for (Object segmentObj : group) {
+                        String groupText = "";
+                        
                         JSONObject segment = (JSONObject) segmentObj;
                         Object[] segmentKeys = segment.keySet().toArray();
                         for (Object statisticKey : segmentKeys) {
-                            content.add(cmp.text("   " + statisticKey.toString() + ":").setStyle(templateDefault.boldStyleFont10));
+                            groupText += "<br/>" + statisticKey.toString() + ": ";
                             JSONObject statistics = (JSONObject) segment.get(statisticKey);
                             Object[] statisticKeys = statistics.keySet().toArray();
 
                             String totalKey = statisticKeys[0].toString();
                             String totalObject = statistics.get(totalKey).toString();
 
-                            content.add(cmp.text("        <b>" + totalKey + "</b> : " + totalObject).setStyle(getStyleMarkedUp()));
+                            groupText += "<b>(" + totalKey + "</b> : " + totalObject;
 
                             if (statisticKeys.length > 1) {
+                                groupText += " | ";
                                 String amountKey = statisticKeys[1].toString();
                                 String amountObject = statistics.get(amountKey).toString();
-                                content.add(cmp.text("        <b>" + amountKey + "</b> : " + amountObject).setStyle(getStyleMarkedUp()));
+                                groupText += "<b>" + amountKey + "</b> : " + amountObject;
                             }
+                            groupText += ")";
+                            
+                            content.add(cmp.text(groupText).setStyle(getStyleMarkedUp()));
                         }
                     }
 
