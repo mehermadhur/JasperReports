@@ -58,9 +58,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import static net.sf.dynamicreports.report.builder.DynamicReports.hyperLink;
-//import org.apache.log4j.BasicConfigurator;
-//import org.apache.log4j.Logger;
-
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Logger;
 
 /**
  *
@@ -73,7 +72,7 @@ public class MainClass {
     private JasperReportBuilder report = null;
     private StyleBuilder cardStyle;
     private final int MAX_FILTERS_ROWS = 10;
-    
+
     // Arguments
     private String reportName;
     private String reportTitle;
@@ -81,21 +80,21 @@ public class MainClass {
     private List<String> tableColumnName;
     private List<String> filters;
     private JSONObject aggregations;
-    
+
     public MainClass() {
         report = report();
         createCardStyle();
     }
 
     public static void main(String[] args) throws Exception {
-        
-        
+
         if (args == null || args.length != 1) {
             throw new IllegalArgumentException("Número de parâmetros inválido ou parâmetros não foram recebidos.");
         }
 
-//        BasicConfigurator.configure();
-        try{
+        BasicConfigurator.configure();
+
+        try {
             MainClass main = new MainClass();
             main.extractAndValidateParams(args[0]);
             main.createReport();
@@ -103,12 +102,13 @@ public class MainClass {
             log(e);
         }
     }
-//    private static Logger logger = Logger.getLogger(MainClass.class);
-    
+
+    private static Logger logger = Logger.getLogger(MainClass.class);
+
     private static void log(Throwable e) throws IOException {
-//        logger.info("paaah!", e);
+        logger.info("paaah!", e);
     }
-    
+
     private static void log(String msg) throws IOException {
 //        logger.info(msg);
     }
@@ -153,10 +153,6 @@ public class MainClass {
 
         if (extractFields.size() != tableColumnName.size()) {
             throw new IllegalArgumentException("fields and columns have a different sizes.");
-        }
-
-        if (filters == null || filters.isEmpty()) {
-            throw new IllegalArgumentException("'filters' argument is invalid");
         }
     }
 
@@ -206,7 +202,7 @@ public class MainClass {
 
         HorizontalListBuilder footerList = cmp.horizontalList(
                 cmp.text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
-                Components.pageXofY().setHorizontalAlignment(HorizontalAlignment.CENTER), 
+                Components.pageXofY().setHorizontalAlignment(HorizontalAlignment.CENTER),
                 Components.currentDate().setHorizontalAlignment(HorizontalAlignment.RIGHT)
         );
 
@@ -214,16 +210,29 @@ public class MainClass {
     }
 
     private void reportCreateInfoPage() throws MalformedURLException, IOException {
+
+        HorizontalListBuilder horizontalList = cmp.horizontalList();
+        horizontalList.setStyle(stl.style(10));
+        
+        ComponentBuilder<?, ?> compFilters = createFiltersComponent("Filters");
+        ComponentBuilder<?, ?> compGroups = createGroupsComponent("Groups");
+        ComponentBuilder<?, ?> compSum = createSumComponent("Sum");
+        
+        if (compFilters != null) {
+            horizontalList.add(cmp.hListCell(compFilters).heightFixedOnTop());
+        }
+        
+        if (compGroups != null) {
+            horizontalList.add(cmp.hListCell(compGroups).heightFixedOnTop());
+        }
+        
+        if (compSum != null) {
+            horizontalList.add(cmp.hListCell(compSum).heightFixedOnTop());
+        }
+
         report.title(
                 createTitleComponent(reportTitle),
-                cmp.horizontalList()
-                .setStyle(stl.style(10))
-                //                                .setGap(300) // Comentado pois limita o tamanho das colunas verticais dos filtros
-                .add(
-                        cmp.hListCell(createFiltersComponent("Filters")).heightFixedOnTop(),
-                        cmp.hListCell(createGroupsComponent("Groups")).heightFixedOnTop(),
-                        cmp.hListCell(createSumComponent("Sum")).heightFixedOnTop()
-                ),
+                horizontalList,
                 cmp.verticalGap(10)
         );
     }
@@ -235,38 +244,41 @@ public class MainClass {
     }
 
     private ComponentBuilder<?, ?> createFiltersComponent(String label) throws IOException {
-        
-        HorizontalListBuilder superList = cmp.horizontalList();
-        HorizontalListBuilder card1 = null;
-        VerticalListBuilder vertList1 = null;
+        if (filters != null && !filters.isEmpty()) {
 
-        int cont = 1;
+            HorizontalListBuilder superList = cmp.horizontalList();
+            HorizontalListBuilder card1 = null;
+            VerticalListBuilder vertList1 = null;
 
-        for (String extractField : filters) {
-            log(extractField);
+            int cont = 1;
 
-            if (cont == 1) {
-                card1 = createCardComponent();
-                vertList1 = cmp.verticalList();
+            for (String extractField : filters) {
+                log(extractField);
+
+                if (cont == 1) {
+                    card1 = createCardComponent();
+                    vertList1 = cmp.verticalList();
+                }
+
+                HorizontalListBuilder horizontalData = cmp.horizontalList();
+                horizontalData.add(cmp.text(extractField).setStyle(getStyleMarkedUp()));
+
+                vertList1.add(horizontalData);
+
+                if (cont == MAX_FILTERS_ROWS || cont == filters.size()) {
+                    cont = 1;
+
+                    card1.add(vertList1);
+                    superList.add(card1);
+                } else {
+                    cont++;
+                }
             }
-
-            HorizontalListBuilder horizontalData = cmp.horizontalList();
-            horizontalData.add(cmp.text(extractField).setStyle(getStyleMarkedUp()));
-
-            vertList1.add(horizontalData);
-
-            if (cont == MAX_FILTERS_ROWS || cont == filters.size()) {
-                cont = 1;
-
-                card1.add(vertList1);
-                superList.add(card1);
-            } else {
-                cont++;
-            }
+            return cmp.verticalList(
+                    cmp.text(label).setStyle(templateDefault.boldStyle),
+                    superList);
         }
-        return cmp.verticalList(
-                cmp.text(label).setStyle(templateDefault.boldStyle),
-                superList);
+        return null;
     }
 
     private ComponentBuilder<?, ?> createGroupsComponent(String label) throws IOException {
@@ -274,7 +286,7 @@ public class MainClass {
 
             JSONArray groups = (JSONArray) aggregations.get("group");
 
-            if (groups != null) {
+            if (groups != null && !groups.isEmpty()) {
                 VerticalListBuilder listSuper = cmp.verticalList();
 
                 String key;
@@ -297,7 +309,7 @@ public class MainClass {
                             content.add(cmp.text("   " + statisticKey.toString() + ":").setStyle(templateDefault.boldStyleFont10));
                             JSONObject statistics = (JSONObject) segment.get(statisticKey);
                             Object[] statisticKeys = statistics.keySet().toArray();
-                            
+
                             String totalKey = statisticKeys[0].toString();
                             String totalObject = statistics.get(totalKey).toString();
 
@@ -320,7 +332,7 @@ public class MainClass {
                         listSuper);
             }
         }
-        return cmp.verticalList();
+        return null;
     }
 
     private ComponentBuilder<?, ?> createSumComponent(String label) throws IOException {
@@ -328,7 +340,7 @@ public class MainClass {
 
             JSONArray sumArray = (JSONArray) aggregations.get("sum");
 
-            if (sumArray != null) {
+            if (sumArray != null && !sumArray.isEmpty()) {
 
                 String key, value;
 
@@ -342,8 +354,8 @@ public class MainClass {
 
                     key = (String) sumField.keySet().toArray()[0];
                     log("key " + key);
-                                       
-                    value = String.valueOf(sumField.get(key));                    
+
+                    value = String.valueOf(sumField.get(key));
                     log("value " + sumField.get(key));
 
                     VerticalListBuilder content = cmp.verticalList();
@@ -363,7 +375,7 @@ public class MainClass {
                         listSuper);
             }
         }
-        return cmp.verticalList();
+        return null;
     }
 
     private HorizontalListBuilder createCardComponent() {
@@ -404,7 +416,7 @@ public class MainClass {
                 = cmp.horizontalList(
                         cmp.verticalList(
                                 cmp.text(reportTitle).setStyle(templateDefault.bold22CenteredStyle).setHorizontalAlignment(HorizontalAlignment.LEFT)
-//                                ,cmp.text(urlOperacao).setStyle(templateDefault.italicStyle)
+                        //                                ,cmp.text(urlOperacao).setStyle(templateDefault.italicStyle)
                         )).setFixedWidth(300);
 
         return cmp.horizontalList()
@@ -459,4 +471,3 @@ public class MainClass {
         outputStream.close();
     }
 }
-
