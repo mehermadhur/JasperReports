@@ -22,6 +22,7 @@ import net.sf.dynamicreports.report.constant.VerticalAlignment;
 public class TemplateDefault extends ReportTemplateBuilder {
 
     public static final StyleBuilder rootStyle = stl.style().setPadding(2);
+    public static final StyleBuilder testecapiroto = stl.style().setAlignment(HorizontalAlignment.RIGHT, VerticalAlignment.MIDDLE);
     public static final StyleBuilder boldStyle = stl.style(rootStyle).bold();
     public static final StyleBuilder styleFont5 = stl.style(rootStyle).setFontSize(5);
     public static final StyleBuilder boldStyleFont5 = stl.style(rootStyle).bold().setFontSize(5);
