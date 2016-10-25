@@ -8,156 +8,97 @@ package com.versul.main;
 import com.versul.reports.TemplateDefault;
 import java.awt.Color;
 import java.awt.Desktop;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
-import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.logging.Level;
 import net.sf.dynamicreports.jasper.builder.JasperReportBuilder;
 import net.sf.dynamicreports.jasper.builder.export.JasperPdfExporterBuilder;
 import net.sf.dynamicreports.report.builder.DynamicReports;
-import static net.sf.dynamicreports.report.builder.DynamicReports.cmp;
-import static net.sf.dynamicreports.report.builder.DynamicReports.col;
-import static net.sf.dynamicreports.report.builder.DynamicReports.export;
-import static net.sf.dynamicreports.report.builder.DynamicReports.report;
-import static net.sf.dynamicreports.report.builder.DynamicReports.stl;
 import net.sf.dynamicreports.report.builder.HyperLinkBuilder;
+import net.sf.dynamicreports.report.builder.column.ColumnBuilder;
 import net.sf.dynamicreports.report.builder.component.ComponentBuilder;
 import net.sf.dynamicreports.report.builder.component.Components;
 import net.sf.dynamicreports.report.builder.component.HorizontalListBuilder;
+import net.sf.dynamicreports.report.builder.component.HorizontalListCellBuilder;
+import net.sf.dynamicreports.report.builder.component.HyperLinkComponentBuilder;
+import net.sf.dynamicreports.report.builder.component.TextFieldBuilder;
 import net.sf.dynamicreports.report.builder.component.VerticalListBuilder;
 import net.sf.dynamicreports.report.builder.datatype.DataTypes;
 import net.sf.dynamicreports.report.builder.style.PenBuilder;
+import net.sf.dynamicreports.report.builder.style.ReportStyleBuilder;
 import net.sf.dynamicreports.report.builder.style.StyleBuilder;
+import net.sf.dynamicreports.report.builder.style.Styles;
 import net.sf.dynamicreports.report.constant.HorizontalAlignment;
 import net.sf.dynamicreports.report.constant.Markup;
 import net.sf.dynamicreports.report.constant.PageOrientation;
 import net.sf.dynamicreports.report.constant.PageType;
-import net.sf.dynamicreports.report.definition.datatype.DRIDataType;
 import net.sf.dynamicreports.report.exception.DRException;
+import net.sf.jasperreports.engine.JREmptyDataSource;
 import net.sf.jasperreports.engine.JRException;
-import net.sf.jasperreports.engine.JRParameter;
 import net.sf.jasperreports.engine.JRPrintHyperlink;
-import net.sf.jasperreports.engine.JasperExportManager;
-import net.sf.jasperreports.engine.JasperFillManager;
-import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.data.JsonDataSource;
-import net.sf.jasperreports.engine.query.JsonQueryExecuterFactory;
 import net.sf.jasperreports.view.JRHyperlinkListener;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Logger;
-import static net.sf.dynamicreports.report.builder.DynamicReports.hyperLink;
 
-/**
- *
- * @author desenv12
- */
 public class MainClass {
 
+    private final int DPI = 72;
+    private final double CM_PER_INCH = 2.54D;
     private final TemplateDefault templateDefault = new TemplateDefault();
     private final JSONParser parser = new JSONParser();
     private JasperReportBuilder report = null;
     private StyleBuilder cardStyle;
-
-    // Arguments
-    private int totalRows;
+    private long totalRows;
     private String reportName;
     private String reportTitle;
     private List<String> extractFields;
-    private List<String> tableColumnName;
+    private List<JSONObject> tableColumnName;
     private JSONObject filters;
     private JSONObject aggregations;
+    private String created;
+    private int startPage;
 
     public MainClass() {
-        report = report();
+        this.report = DynamicReports.report();
         createCardStyle();
     }
 
-    public static void main(String[] args) throws Exception {
-
-        if (args == null || args.length != 1) {
-            throw new IllegalArgumentException("Número de parâmetros inválido ou parâmetros não foram recebidos.");
-        }
-
-        BasicConfigurator.configure();
+    public static void main(String[] args)
+            throws Exception {
 
         try {
             MainClass main = new MainClass();
-            main.extractAndValidateParams(args[0]);
-            main.createReport();
+            if (args.length == 1) {
+                log("cover");
+                main.extractAndValidateCoverParams(args[0]);
+                main.createCoverPage();
+            } else if (args.length > 1) {
+                log("report");
+                main.extractAndValidateReportParams(args[1]);
+                main.createReport();
+            } else {
+                throw new IllegalArgumentException("N��mero de par��metros inv��lido ou par��metros n��o foram recebidos.");
+            }
         } catch (Exception e) {
             log(e);
         }
     }
 
-    private static Logger logger = Logger.getLogger(MainClass.class);
+    private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(MainClass.class);
 
-    private static void log(Throwable e) throws IOException {
+    private static void log(Throwable e)
+            throws IOException {
         logger.info("paaah!", e);
     }
 
-    private static void log(String msg) throws IOException {
-//        logger.info(msg);
-    }
-
-    private void extractAndValidateParams(String jsonArgs) throws ParseException {
-
-        JSONObject arguments = (JSONObject) parser.parse(jsonArgs);
-
-        Object reportNameObject = arguments.get("report_name");
-        Object reportTitleObject = arguments.get("report_title");
-
-        if (reportNameObject == null) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
-
-        if (reportTitleObject == null) {
-            throw new IllegalArgumentException("'report_title' argument is invalid");
-        }
-
-        reportName = reportNameObject.toString();
-        reportTitle = reportTitleObject.toString();
-        extractFields = (JSONArray) arguments.get("fields");
-        tableColumnName = (JSONArray) arguments.get("columns");
-        filters = (JSONObject) arguments.get("filters");
-        aggregations = (JSONObject) arguments.get("aggs");
-        totalRows = Integer.parseInt(arguments.get("count").toString());
-
-        if (reportName.isEmpty()) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
-
-        if (reportTitle.isEmpty()) {
-            throw new IllegalArgumentException("'report_title' argument is invalid");
-        }
-
-        if (extractFields == null || extractFields.isEmpty()) {
-            throw new IllegalArgumentException("'fields' argument is invalid");
-        }
-
-        if (tableColumnName == null || tableColumnName.isEmpty()) {
-            throw new IllegalArgumentException("'columns' argument is invalid");
-        }
-
-        if (extractFields.size() != tableColumnName.size()) {
-            throw new IllegalArgumentException("fields and columns have a different sizes.");
-        }
-    }
-
-    private void createReport() throws SQLException, IOException, JRException, DRException {
+    private void createReport()
+            throws IOException, DRException, Exception {
         log("CreatedInstance");
         reportCreateInstance();
         log("ReceiptData");
@@ -166,310 +107,381 @@ public class MainClass {
         reportConfigure();
         log("CreateColumns");
         reportCreateColumns();
-        log("Createinfopage");
-        reportCreateInfoPage();
-        log("export");
-        reportExport();
+        log("to file");
+        reportToFile();
         log("done");
     }
 
+    private void createCoverPage()
+            throws Exception {
+        log("CreatedInstance");
+        reportCreateInstance();
+        log("Configure");
+        reportConfigure();
+        this.report.setDataSource(new JREmptyDataSource());
+        log("Createinfopage");
+        reportCreateInfoPage();
+        log("covert to file");
+        reportToFile();
+        log("done");
+    }
+
+    private void extractAndValidateReportParams(String jsonArgs)
+            throws ParseException {
+        JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
+
+        Object reportNameObject = arguments.get("report_name");
+        if (reportNameObject == null) {
+            throw new IllegalArgumentException("'report_name' argument is invalid");
+        }
+        this.reportName = reportNameObject.toString();
+        this.extractFields = ((JSONArray) arguments.get("fields"));
+        this.tableColumnName = ((JSONArray) arguments.get("columns"));
+        this.created = ((String) arguments.get("created"));
+        this.startPage = Integer.valueOf(arguments.get("page").toString()).intValue();
+        if (this.reportName.isEmpty()) {
+            throw new IllegalArgumentException("'report_name' argument is invalid");
+        }
+        if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
+            throw new IllegalArgumentException("'columns' argument is invalid");
+        }
+        if (this.extractFields.size() != this.tableColumnName.size()) {
+            throw new IllegalArgumentException("fields and columns have different sizes.");
+        }
+    }
+
+    private void extractAndValidateCoverParams(String jsonArgs)
+            throws ParseException {
+        JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
+
+        Object reportNameObject = arguments.get("report_name");
+        Object reportTitleObject = arguments.get("report_title");
+        if (reportNameObject == null) {
+            throw new IllegalArgumentException("'report_name' argument is invalid");
+        }
+        if (reportTitleObject == null) {
+            throw new IllegalArgumentException("'report_title' argument is invalid");
+        }
+        this.reportName = reportNameObject.toString();
+        this.reportTitle = reportTitleObject.toString();
+        this.extractFields = ((JSONArray) arguments.get("fields"));
+        this.tableColumnName = ((JSONArray) arguments.get("columns"));
+        this.filters = ((JSONObject) arguments.get("filters"));
+        this.aggregations = ((JSONObject) arguments.get("aggs"));
+        this.totalRows = Long.valueOf(arguments.get("count").toString()).longValue();
+        this.created = ((String) arguments.get("created"));
+        this.startPage = 1;
+        if (this.reportName.isEmpty()) {
+            throw new IllegalArgumentException("'report_name' argument is invalid");
+        }
+        if (this.reportTitle.isEmpty()) {
+            throw new IllegalArgumentException("'report_title' argument is invalid");
+        }
+        if ((this.extractFields == null) || (this.extractFields.isEmpty())) {
+            throw new IllegalArgumentException("'fields' argument is invalid");
+        }
+        if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
+            throw new IllegalArgumentException("'columns' argument is invalid");
+        }
+        if (this.extractFields.size() != this.tableColumnName.size()) {
+            throw new IllegalArgumentException("fields and columns have different sizes.");
+        }
+    }
+
     private void reportCreateInstance() {
-        report = DynamicReports.report();
-//        report.title(Components.text(reportTitle)
-//                .setStyle(TemplateDefault.bold12CenteredStyle)
-//                .setHorizontalAlignment(HorizontalAlignment.CENTER)
-//                .setFixedRows(2));
+        this.report = DynamicReports.report();
     }
 
-    private void reportReceiptData() throws JRException {
+    private void reportReceiptData()
+            throws JRException, DRException {
+        this.report.setStartPageNumber(Integer.valueOf(this.startPage));
         JsonDataSource jsonDataSource = new JsonDataSource(System.in);
-        report.setDataSource(jsonDataSource);
+        this.report.setDataSource(jsonDataSource);
     }
 
-    private void reportCreateColumns() throws DRException {
+    private static void log(String msg)
+            throws IOException {
+    }
+
+    private int getDefaultColumnWidth(int totalColumns, List<JSONObject> columns) {
+        int numColumnsWithWidth = 0;
+        int accumWidth = 0;
+        for (int i = 0; i < totalColumns; i++) {
+            JSONObject column = (JSONObject) columns.get(i);
+            try {
+                log(column.toJSONString());
+            } catch (IOException ex) {
+                java.util.logging.Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            Object width = column.get("width");
+            if (width != null) {
+                accumWidth += new Integer(String.valueOf(width)).intValue();
+                numColumnsWithWidth++;
+            }
+        }
+        if (numColumnsWithWidth == 0) {
+            return 0;
+        }
+        int pageWithoutMargins = PageType.A4.getHeight() - 10 - 10;
+
+        double accumWidthInPixels = mmToPixel(accumWidth);
+
+        int defaultWidth = new Double((pageWithoutMargins - accumWidthInPixels) / (totalColumns - numColumnsWithWidth)).intValue();
+        try {
+            log(String.valueOf(PageType.A4.getHeight()));
+            log(String.valueOf(accumWidthInPixels));
+            log(String.valueOf(pageWithoutMargins));
+            log(String.valueOf(defaultWidth));
+        } catch (IOException ex) {
+            java.util.logging.Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return defaultWidth;
+    }
+
+    private double mmToPixel(int mm) {
+        double pixelsPerMM = 2.8346456692913384D;
+        return pixelsPerMM * mm;
+    }
+
+    private void reportCreateColumns()
+            throws DRException {
         int cont = 0;
-        int size = extractFields.size();
+        DynamicReports.margin().getMargin().getTop();
+        int size = this.extractFields.size();
+        int defaultWidth = getDefaultColumnWidth(size, this.tableColumnName);
         while (cont < size) {
-            report.columns(col.column(tableColumnName.get(cont), extractFields.get(cont), (DRIDataType) DataTypes.detectType("String")));
+            JSONObject column = (JSONObject) this.tableColumnName.get(cont);
+            String label = (String) column.get("label");
+            String align = (String) column.get("align");
+            Object widthParam = column.get("width");
+            Integer width = null;
+            if (widthParam == null) {
+                width = Integer.valueOf(defaultWidth);
+            } else {
+                width = Integer.valueOf(new Double(mmToPixel(Integer.valueOf(String.valueOf(widthParam)).intValue())).intValue());
+            }
+            
+            this.report.columns(new ColumnBuilder[]{
+                DynamicReports.col
+                .column(label, (String) this.extractFields.get(cont), DataTypes.stringType())
+                .setFixedWidth(width)
+                .setStretchWithOverflow(Boolean.valueOf(false))
+                .setStyle(getAlignmentStyle(align))
+            });
+
             cont++;
         }
     }
 
+    private StyleBuilder getAlignmentStyle(String alignment) {
+        HorizontalAlignment align = HorizontalAlignment.LEFT;
+        if (alignment != null) {
+            if (alignment.equalsIgnoreCase("CENTER")) {
+                align = HorizontalAlignment.CENTER;
+            } else if (alignment.equalsIgnoreCase("RIGHT")) {
+                align = HorizontalAlignment.RIGHT;
+            }
+        }
+        return (StyleBuilder) ((StyleBuilder) ((StyleBuilder) Styles.style().setHorizontalAlignment(align)).setLeftPadding(Integer.valueOf(2))).setRightPadding(Integer.valueOf(2));
+    }
+
     private void reportConfigure() {
-        // Orientação da página
-        report.setPageFormat(PageType.A4, PageOrientation.LANDSCAPE);
+        this.report.setPageFormat(PageType.A4, PageOrientation.LANDSCAPE);
 
-        report.setTemplate(templateDefault);
+        this.report.setTemplate(this.templateDefault);
+        HyperLinkComponentBuilder creationTime;
+        if (this.created == null) {
+            creationTime = Components.currentDate().setPattern("dd/MM/yyyy HH:mm:ss").setHorizontalAlignment(HorizontalAlignment.RIGHT);
+        } else {
+            creationTime = DynamicReports.cmp.text(this.created).setHorizontalAlignment(HorizontalAlignment.RIGHT);
+        }
+        HorizontalListBuilder footerList = DynamicReports.cmp.horizontalList(new ComponentBuilder[]{DynamicReports.cmp
+            .text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
+            Components.pageNumber().setHorizontalAlignment(HorizontalAlignment.CENTER), creationTime});
 
-        HorizontalListBuilder footerList = cmp.horizontalList(
-                cmp.text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
-                Components.pageXofY().setHorizontalAlignment(HorizontalAlignment.CENTER),
-                Components.currentDate().setPattern("dd/MM/yyyy").setHorizontalAlignment(HorizontalAlignment.RIGHT)
-        );
-
-        report.pageFooter(footerList);
+        this.report.pageFooter(new ComponentBuilder[]{footerList});
     }
 
-    private void reportCreateInfoPage() throws MalformedURLException, IOException {
+    private void reportCreateInfoPage()
+            throws MalformedURLException, Exception {
+        HorizontalListBuilder horizontalList = DynamicReports.cmp.horizontalList();
+        horizontalList.setStyle(DynamicReports.stl.style(Integer.valueOf(10)));
 
-        HorizontalListBuilder horizontalList = cmp.horizontalList();
-        horizontalList.setStyle(stl.style(10));
-
-        ComponentBuilder<?, ?> compFilters = createFiltersComponent("Filters");
-        ComponentBuilder<?, ?> compGroups = createGroupsComponent("Groups (Top 10)");
-        ComponentBuilder<?, ?> compSum = createSumComponent("Sum");
-
+        ComponentBuilder<?, ?> compFilters = createFiltersComponent("Filtros Utilizados");
+        ComponentBuilder<?, ?> compGroups = createGroupsComponent("Grupos (Top 10)");
+        ComponentBuilder<?, ?> compSum = createSumComponent("Totais");
         if (compFilters != null) {
-            horizontalList.add(cmp.hListCell(compFilters).heightFixedOnTop());
+            horizontalList.add(new HorizontalListCellBuilder[]{DynamicReports.cmp.hListCell(compFilters).heightFixedOnTop()});
         }
-
         if (compGroups != null) {
-            horizontalList.add(cmp.hListCell(compGroups).heightFixedOnTop());
+            horizontalList.add(new HorizontalListCellBuilder[]{DynamicReports.cmp.hListCell(compGroups).heightFixedOnTop()});
         }
-
         if (compSum != null) {
-            horizontalList.add(cmp.hListCell(compSum).heightFixedOnTop());
+            horizontalList.add(new HorizontalListCellBuilder[]{DynamicReports.cmp.hListCell(compSum).heightFixedOnTop()});
         }
-
-        report.title(
-                createTitleComponent(reportTitle),
-                horizontalList,
-                cmp.verticalGap(10)
-        );
+        this.report.title(new ComponentBuilder[]{
+            createTitleComponent(this.reportTitle), horizontalList, DynamicReports.cmp
+            .verticalGap(10)});
     }
 
-    private void reportExport() throws DRException {
-        JasperPdfExporterBuilder pdfExporter = export.pdfExporter(System.out);
-        report.toPdf(pdfExporter);
-//        report.show(true);
+    private void reportToFile()
+            throws DRException, JRException {
+        JasperPdfExporterBuilder pdfExporter = DynamicReports.export.pdfExporter(System.out);
+        this.report.toPdf(pdfExporter);
     }
 
-    private ComponentBuilder<?, ?> createFiltersComponent(String label) throws IOException {
-        if (filters != null && !filters.isEmpty()) {
+    private ComponentBuilder<?, ?> createFiltersComponent(String label)
+            throws IOException {
+        if ((this.filters != null) && (!this.filters.isEmpty())) {
+            List<String> andConditions = (List) this.filters.get("and");
+            List<String> orConditions = (List) this.filters.get("or");
 
-            List<String> andConditions = (List) filters.get("and");
-            List<String> orConditions = (List) filters.get("or");
-
-            HorizontalListBuilder superList = cmp.horizontalList();
+            HorizontalListBuilder superList = DynamicReports.cmp.horizontalList();
             HorizontalListBuilder card = createCardComponent();
-            VerticalListBuilder verticalList = cmp.verticalList();
-
-            if (orConditions != null && !orConditions.isEmpty()) {
-                verticalList.add(cmp.text("At least one condition passed").setStyle(templateDefault.boldStyleFont10));
+            VerticalListBuilder verticalList = DynamicReports.cmp.verticalList();
+            if ((orConditions != null) && (!orConditions.isEmpty())) {
+                verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("Ao menos uma condi����o atendida:").setStyle(TemplateDefault.boldStyleFont10)});
                 for (String extractField : orConditions) {
-                    verticalList.add(cmp.text("    " + extractField).setStyle(getStyleMarkedUp()));
+                    verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp())});
                 }
             }
-            if (andConditions != null && !andConditions.isEmpty()) {
-                verticalList.add(cmp.text("All conditions passed").setStyle(templateDefault.boldStyleFont10));
+            if ((andConditions != null) && (!andConditions.isEmpty())) {
+                verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("Todas as condi����es atendidas:").setStyle(TemplateDefault.boldStyleFont10)});
                 for (String extractField : andConditions) {
-                    verticalList.add(cmp.text("    " + extractField).setStyle(getStyleMarkedUp()));
+                    verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp())});
                 }
             }
-            card.add(verticalList);
-            superList.add(card);
+            card.add(new ComponentBuilder[]{verticalList});
+            superList.add(new ComponentBuilder[]{card});
 
-            return cmp.verticalList(
-                    cmp.text(label).setStyle(templateDefault.boldStyle),
-                    superList);
+            return DynamicReports.cmp.verticalList(new ComponentBuilder[]{DynamicReports.cmp
+                .text(label).setStyle(TemplateDefault.boldStyle), superList});
         }
         return null;
     }
 
-    private ComponentBuilder<?, ?> createGroupsComponent(String label) throws IOException {
-        if (aggregations != null && aggregations.containsKey("group")) {
-
-            JSONArray groups = (JSONArray) aggregations.get("group");
-
-            if (groups != null && !groups.isEmpty()) {
-                VerticalListBuilder listSuper = cmp.verticalList();
-
-                String key;
-                JSONArray group;
-
+    private ComponentBuilder<?, ?> createGroupsComponent(String label)
+            throws IOException {
+        if ((this.aggregations != null) && (this.aggregations.containsKey("group"))) {
+            JSONArray groups = (JSONArray) this.aggregations.get("group");
+            if ((groups != null) && (!groups.isEmpty())) {
+                VerticalListBuilder listSuper = DynamicReports.cmp.verticalList();
                 for (Object groupObj : groups) {
                     HorizontalListBuilder cardComponent = createCardComponent();
-                    // Aggregation object
+
                     JSONObject groupField = (JSONObject) groupObj;
-                    key = (String) groupField.keySet().toArray()[0];
-                    group = (JSONArray) groupField.get(key);
+                    String key = (String) groupField.keySet().toArray()[0];
+                    JSONArray group = (JSONArray) groupField.get(key);
 
-                    VerticalListBuilder content = cmp.verticalList();
-                    content.add(cmp.text(key));
-
+                    VerticalListBuilder content = DynamicReports.cmp.verticalList();
+                    content.add(new ComponentBuilder[]{DynamicReports.cmp.text(key)});
                     for (Object segmentObj : group) {
                         String groupText = "";
 
                         JSONObject segment = (JSONObject) segmentObj;
                         Object[] segmentKeys = segment.keySet().toArray();
                         for (Object statisticKey : segmentKeys) {
-                            groupText += "    " + statisticKey.toString() + ": ";
+                            groupText = groupText + "    " + statisticKey.toString() + ": ";
                             JSONObject statistics = (JSONObject) segment.get(statisticKey);
                             Object[] statisticKeys = statistics.keySet().toArray();
 
                             String totalKey = statisticKeys[0].toString();
                             String totalObject = statistics.get(totalKey).toString();
 
-                            groupText += "<b>(" + totalKey + "</b> : " + totalObject;
-
+                            groupText = groupText + "<b>(" + totalKey + "</b> : " + totalObject;
                             if (statisticKeys.length > 1) {
-                                groupText += " | ";
+                                groupText = groupText + " | ";
                                 String amountKey = statisticKeys[1].toString();
                                 String amountObject = statistics.get(amountKey).toString();
-                                groupText += "<b>" + amountKey + "</b> : " + amountObject;
+                                groupText = groupText + "<b>" + amountKey + "</b> : " + amountObject;
                             }
-                            groupText += ")";
+                            groupText = groupText + ")";
 
-                            content.add(cmp.text(groupText).setStyle(getStyleMarkedUp()));
+                            content.add(new ComponentBuilder[]{DynamicReports.cmp.text(groupText).setStyle(getStyleMarkedUp())});
                         }
                     }
-
-                    cardComponent.add(content);
-                    listSuper.add(cardComponent);
+                    cardComponent.add(new ComponentBuilder[]{content});
+                    listSuper.add(new ComponentBuilder[]{cardComponent});
                 }
-
-                return cmp.verticalList(
-                        cmp.text(label).setStyle(templateDefault.boldStyle),
-                        listSuper);
+                return DynamicReports.cmp.verticalList(new ComponentBuilder[]{DynamicReports.cmp
+                    .text(label).setStyle(TemplateDefault.boldStyle), listSuper});
             }
         }
         return null;
     }
 
-    private ComponentBuilder<?, ?> createSumComponent(String label) throws IOException {
-        if (aggregations != null && aggregations.containsKey("sum")) {
-
-            JSONArray sumArray = (JSONArray) aggregations.get("sum");
-
-            if (sumArray != null && !sumArray.isEmpty()) {
-
-                String key, value;
-
-                VerticalListBuilder listSuper = cmp.verticalList();
-
+    private ComponentBuilder<?, ?> createSumComponent(String label)
+            throws Exception {
+        if ((this.aggregations != null) && (this.aggregations.containsKey("sum"))) {
+            JSONArray sumArray = (JSONArray) this.aggregations.get("sum");
+            if ((sumArray != null) && (!sumArray.isEmpty())) {
+                VerticalListBuilder listSuper = DynamicReports.cmp.verticalList();
                 for (Object sumObject : sumArray) {
-
                     HorizontalListBuilder cardComponent = createCardComponent();
+                    VerticalListBuilder content = DynamicReports.cmp.verticalList();
+                    HorizontalListBuilder labelSum = DynamicReports.cmp.horizontalList();
 
                     JSONObject sumField = (JSONObject) sumObject;
 
-                    key = (String) sumField.keySet().toArray()[0];
-                    log("key " + key);
+                    String key = sumField.keySet().toArray()[0].toString();
 
-                    value = String.valueOf(sumField.get(key));
-                    log("value " + sumField.get(key));
+                    String value = sumField.get(key).toString();
 
-                    VerticalListBuilder content = cmp.verticalList();
+                    labelSum.add(new ComponentBuilder[]{DynamicReports.cmp.text("<b>" + key + "</b>: " + value).setStyle(getStyleMarkedUp())});
+                    content.add(new ComponentBuilder[]{labelSum});
 
-                    HorizontalListBuilder labelSum = cmp.horizontalList();
-                    labelSum.add(cmp.text("<b>" + key + "</b> : " + value).setStyle(getStyleMarkedUp()));
-                    content.add(labelSum);
-//                    content.setFixedWidth(150);
+                    cardComponent.add(new ComponentBuilder[]{content});
 
-                    cardComponent.add(content);
-
-                    listSuper.add(cardComponent);
+                    listSuper.add(new ComponentBuilder[]{cardComponent});
                 }
-
-                return cmp.verticalList(
-                        cmp.text(label).setStyle(templateDefault.boldStyle),
-                        listSuper);
+                return DynamicReports.cmp.verticalList(new ComponentBuilder[]{DynamicReports.cmp
+                    .text(label).setStyle(TemplateDefault.boldStyle), listSuper});
             }
         }
         return null;
     }
 
     private HorizontalListBuilder createCardComponent() {
-        HorizontalListBuilder cardComponent = cmp.horizontalList().setBaseStyle(stl.style().setLeftPadding(5));
-        cardComponent.setStyle(cardStyle);
+        HorizontalListBuilder cardComponent = DynamicReports.cmp.horizontalList().setBaseStyle((ReportStyleBuilder) DynamicReports.stl.style().setLeftPadding(Integer.valueOf(5)));
+        cardComponent.setStyle(this.cardStyle);
         return cardComponent;
     }
 
     private void createCardStyle() {
-        PenBuilder pen1Point = stl.pen1Point().setLineColor(Color.white);
-        cardStyle = stl.style(pen1Point).setPadding(10);
-        cardStyle.setBackgroundColor(new Color(224, 224, 224));
+        PenBuilder pen1Point = DynamicReports.stl.pen1Point().setLineColor(Color.white);
+        this.cardStyle = ((StyleBuilder) DynamicReports.stl.style(pen1Point).setPadding(Integer.valueOf(10)));
+        this.cardStyle.setBackgroundColor(new Color(224, 224, 224));
     }
 
     private StyleBuilder getStyleMarkedUp() {
-        return stl.style().setMarkup(Markup.STYLED);
+        return (StyleBuilder) DynamicReports.stl.style().setMarkup(Markup.STYLED);
     }
 
-    private ComponentBuilder<?, ?> createTitleComponent(String label) throws MalformedURLException {
-
+    private ComponentBuilder<?, ?> createTitleComponent(String label)
+            throws MalformedURLException {
         URL logo = new URL("http://static-files04.cdnandroid.com/76/43/3e/08/imagen-rotativo-rondon-0thumb.jpg");
         String urlOperacao = "https://rondonopolis.s2way.com/";
-        HyperLinkBuilder link = hyperLink(urlOperacao);
+        HyperLinkBuilder link = DynamicReports.hyperLink(urlOperacao);
 
         JRHyperlinkListener a = new JRHyperlinkListener() {
-            @Override
-            public void gotoHyperlink(JRPrintHyperlink jrph) throws JRException {
+            public void gotoHyperlink(JRPrintHyperlink jrph)
+                    throws JRException {
                 try {
                     Desktop.getDesktop().browse(new URI(jrph.getHyperlinkAnchor()));
-                } catch (Exception ex) {
-//                    Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (Exception localException) {
                 }
-
             }
         };
+        ComponentBuilder<?, ?> dynamicReportsComponent = DynamicReports.cmp.horizontalList(new ComponentBuilder[]{
+            ((TextFieldBuilder) DynamicReports.cmp.text(this.reportTitle).setStyle(TemplateDefault.bold22CenteredStyle)).setHorizontalAlignment(HorizontalAlignment.LEFT), DynamicReports.cmp
+            .text("Total de Registros: " + this.totalRows).setStyle(TemplateDefault.testecapiroto)});
 
-        ComponentBuilder<?, ?> dynamicReportsComponent
-                = cmp.horizontalList(
-                        cmp.text(reportTitle).setStyle(templateDefault.bold22CenteredStyle).setHorizontalAlignment(HorizontalAlignment.LEFT),
-                        cmp.text("Total Records: " + totalRows).setStyle(templateDefault.testecapiroto)
-                //                        cmp.verticalList(
-                //                        )).setFixedWidth(300)
-                );
-
-        return cmp.horizontalList()
-                .add(dynamicReportsComponent)
-                .newRow()
-                .add(cmp.line())
-                .newRow()
-                .add(cmp.verticalGap(10));
-
-//        ComponentBuilder<?, ?> dynamicReportsComponent
-//                = cmp.horizontalList(
-//                        cmp.image(logo).setFixedDimension(60, 60),
-//                        cmp.verticalList(
-////                                cmp.text("s2Way - Rotativo Rondon").setStyle(templateDefault.bold22CenteredStyle).setHorizontalAlignment(HorizontalAlignment.LEFT),
-//                                cmp.text("s2Way - Rotativo Rondon").setStyle(templateDefault.bold22CenteredStyle).setHorizontalAlignment(HorizontalAlignment.LEFT),
-//                                cmp.text(urlOperacao).setStyle(templateDefault.italicStyle).setHyperLink(link))).setFixedWidth(300);
-//
-//        return cmp.horizontalList()
-//                .add(
-//                        dynamicReportsComponent,
-//                        cmp.text(label).setStyle(templateDefault.bold18CenteredStyle).setHorizontalAlignment(HorizontalAlignment.RIGHT))
-//                .newRow()
-//                .add(cmp.line())
-//                .newRow()
-//                .add(cmp.verticalGap(10));
+        return DynamicReports.cmp.horizontalList().add(new ComponentBuilder[]{dynamicReportsComponent}).newRow().add(new ComponentBuilder[]{DynamicReports.cmp.line()}).newRow().add(new ComponentBuilder[]{DynamicReports.cmp.verticalGap(10)});
     }
 
     private void addCustomerAttribute(HorizontalListBuilder list, String label, String value) {
         if (value != null) {
-            list.add(cmp.text(label + ":").setFixedColumns(10).setStyle(templateDefault.boldStyleFont10), cmp.text(value)).newRow();
+            list.add(new ComponentBuilder[]{DynamicReports.cmp.text(label + ":").setFixedColumns(Integer.valueOf(10)).setStyle(TemplateDefault.boldStyleFont10), DynamicReports.cmp.text(value)}).newRow();
         }
-    }
-
-    private void old() throws JRException, FileNotFoundException, IOException {
-        InputStream inputStream = getClass().getResourceAsStream("/report/teste_json_report.jasper");
-        JasperPrint impressao;
-
-        JsonDataSource jsonDataSource = new JsonDataSource(System.in);
-
-        Map<String, Object> params = new HashMap<String, Object>();
-        params.put(JsonQueryExecuterFactory.JSON_DATE_PATTERN, "yyyy-MM-dd");
-        params.put(JsonQueryExecuterFactory.JSON_NUMBER_PATTERN, "#,##0.##");
-        params.put(JsonQueryExecuterFactory.JSON_LOCALE, Locale.ENGLISH);
-        params.put(JRParameter.REPORT_LOCALE, Locale.US);
-
-        impressao = JasperFillManager.fillReport(inputStream, params, jsonDataSource);
-
-        OutputStream outputStream = new FileOutputStream(new File("JasperReport.pdf"));
-        JasperExportManager.exportReportToPdfStream(impressao, outputStream);
-
-        inputStream.close();
-        outputStream.close();
     }
 }
