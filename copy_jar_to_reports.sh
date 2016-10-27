@@ -1,0 +1,2 @@
+rm -rf ~/Documentos/Projects/reports/apps/reports/src/Library/jasper-report.jar
+cp target/JasperReports-1.0-SNAPSHOT-jar-with-dependencies.jar ~/Documentos/Projects/reports/apps/reports/src/Library/jasper-report.jar

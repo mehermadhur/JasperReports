@@ -7,28 +7,22 @@ package com.versul.main;
 
 import com.versul.reports.TemplateDefault;
 import java.awt.Color;
-import java.awt.Desktop;
+import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
 import java.util.List;
-import java.util.logging.Level;
 import net.sf.dynamicreports.jasper.builder.JasperReportBuilder;
 import net.sf.dynamicreports.jasper.builder.export.JasperPdfExporterBuilder;
 import net.sf.dynamicreports.report.builder.DynamicReports;
-import net.sf.dynamicreports.report.builder.HyperLinkBuilder;
-import net.sf.dynamicreports.report.builder.column.ColumnBuilder;
 import net.sf.dynamicreports.report.builder.component.ComponentBuilder;
 import net.sf.dynamicreports.report.builder.component.Components;
 import net.sf.dynamicreports.report.builder.component.HorizontalListBuilder;
-import net.sf.dynamicreports.report.builder.component.HorizontalListCellBuilder;
 import net.sf.dynamicreports.report.builder.component.HyperLinkComponentBuilder;
+import net.sf.dynamicreports.report.builder.component.ImageBuilder;
 import net.sf.dynamicreports.report.builder.component.TextFieldBuilder;
 import net.sf.dynamicreports.report.builder.component.VerticalListBuilder;
 import net.sf.dynamicreports.report.builder.datatype.DataTypes;
 import net.sf.dynamicreports.report.builder.style.PenBuilder;
-import net.sf.dynamicreports.report.builder.style.ReportStyleBuilder;
 import net.sf.dynamicreports.report.builder.style.StyleBuilder;
 import net.sf.dynamicreports.report.builder.style.Styles;
 import net.sf.dynamicreports.report.constant.HorizontalAlignment;
@@ -38,9 +32,8 @@ import net.sf.dynamicreports.report.constant.PageType;
 import net.sf.dynamicreports.report.exception.DRException;
 import net.sf.jasperreports.engine.JREmptyDataSource;
 import net.sf.jasperreports.engine.JRException;
-import net.sf.jasperreports.engine.JRPrintHyperlink;
 import net.sf.jasperreports.engine.data.JsonDataSource;
-import net.sf.jasperreports.view.JRHyperlinkListener;
+import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -48,9 +41,7 @@ import org.json.simple.parser.ParseException;
 
 public class MainClass {
 
-    private final int DPI = 72;
-    private final double CM_PER_INCH = 2.54D;
-    private final TemplateDefault templateDefault = new TemplateDefault();
+    private static Logger logger = Logger.getLogger(MainClass.class);
     private final JSONParser parser = new JSONParser();
     private JasperReportBuilder report = null;
     private StyleBuilder cardStyle;
@@ -63,14 +54,21 @@ public class MainClass {
     private JSONObject aggregations;
     private String created;
     private int startPage;
+    private List<String> logos;
+    private String hyperlinkLogo;
+    private final String IMAGES_PATH = "../images/";
+    private String logoImage = null;
 
     public MainClass() {
         this.report = DynamicReports.report();
         createCardStyle();
     }
 
-    public static void main(String[] args)
-            throws Exception {
+    public static void main(String[] args) {
+
+        if (args.length == 0) {
+            throw new IllegalArgumentException("Application parameters not received!");
+        }
 
         try {
             MainClass main = new MainClass();
@@ -82,76 +80,13 @@ public class MainClass {
                 log("report");
                 main.extractAndValidateReportParams(args[1]);
                 main.createReport();
-            } else {
-                throw new IllegalArgumentException("N��mero de par��metros inv��lido ou par��metros n��o foram recebidos.");
             }
         } catch (Exception e) {
             log(e);
         }
     }
 
-    private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(MainClass.class);
-
-    private static void log(Throwable e)
-            throws IOException {
-        logger.info("paaah!", e);
-    }
-
-    private void createReport()
-            throws IOException, DRException, Exception {
-        log("CreatedInstance");
-        reportCreateInstance();
-        log("ReceiptData");
-        reportReceiptData();
-        log("Configure");
-        reportConfigure();
-        log("CreateColumns");
-        reportCreateColumns();
-        log("to file");
-        reportToFile();
-        log("done");
-    }
-
-    private void createCoverPage()
-            throws Exception {
-        log("CreatedInstance");
-        reportCreateInstance();
-        log("Configure");
-        reportConfigure();
-        this.report.setDataSource(new JREmptyDataSource());
-        log("Createinfopage");
-        reportCreateInfoPage();
-        log("covert to file");
-        reportToFile();
-        log("done");
-    }
-
-    private void extractAndValidateReportParams(String jsonArgs)
-            throws ParseException {
-        JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
-
-        Object reportNameObject = arguments.get("report_name");
-        if (reportNameObject == null) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
-        this.reportName = reportNameObject.toString();
-        this.extractFields = ((JSONArray) arguments.get("fields"));
-        this.tableColumnName = ((JSONArray) arguments.get("columns"));
-        this.created = ((String) arguments.get("created"));
-        this.startPage = Integer.valueOf(arguments.get("page").toString()).intValue();
-        if (this.reportName.isEmpty()) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
-        if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
-            throw new IllegalArgumentException("'columns' argument is invalid");
-        }
-        if (this.extractFields.size() != this.tableColumnName.size()) {
-            throw new IllegalArgumentException("fields and columns have different sizes.");
-        }
-    }
-
-    private void extractAndValidateCoverParams(String jsonArgs)
-            throws ParseException {
+    private void extractAndValidateCoverParams(String jsonArgs) throws ParseException {
         JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
 
         Object reportNameObject = arguments.get("report_name");
@@ -162,13 +97,15 @@ public class MainClass {
         if (reportTitleObject == null) {
             throw new IllegalArgumentException("'report_title' argument is invalid");
         }
+        this.hyperlinkLogo = arguments.get("logo_hyperlink") == null ? "" : arguments.get("logo_hyperlink").toString();
+        this.logos = ((JSONArray) arguments.get("logo"));
         this.reportName = reportNameObject.toString();
         this.reportTitle = reportTitleObject.toString();
         this.extractFields = ((JSONArray) arguments.get("fields"));
         this.tableColumnName = ((JSONArray) arguments.get("columns"));
         this.filters = ((JSONObject) arguments.get("filters"));
         this.aggregations = ((JSONObject) arguments.get("aggs"));
-        this.totalRows = Long.valueOf(arguments.get("count").toString()).longValue();
+        this.totalRows = Long.parseLong(arguments.get("count").toString());
         this.created = ((String) arguments.get("created"));
         this.startPage = 1;
         if (this.reportName.isEmpty()) {
@@ -186,21 +123,92 @@ public class MainClass {
         if (this.extractFields.size() != this.tableColumnName.size()) {
             throw new IllegalArgumentException("fields and columns have different sizes.");
         }
+
+        validateLogos();
+    }
+
+    private void extractAndValidateReportParams(String jsonArgs) throws ParseException {
+        JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
+
+        Object reportNameObject = arguments.get("report_name");
+        if (reportNameObject == null) {
+            throw new IllegalArgumentException("'report_name' argument is invalid");
+        }
+        this.hyperlinkLogo = arguments.get("logo_hyperlink") == null ? "" : arguments.get("logo_hyperlink").toString();
+        this.logos = ((JSONArray) arguments.get("logo"));
+        this.reportName = reportNameObject.toString();
+        this.extractFields = ((JSONArray) arguments.get("fields"));
+        this.tableColumnName = ((JSONArray) arguments.get("columns"));
+        this.created = ((String) arguments.get("created"));
+        this.startPage = Integer.parseInt(arguments.get("page").toString());
+        if (this.reportName.isEmpty()) {
+            throw new IllegalArgumentException("'report_name' argument is invalid");
+        }
+        if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
+            throw new IllegalArgumentException("'columns' argument is invalid");
+        }
+        if (this.extractFields.size() != this.tableColumnName.size()) {
+            throw new IllegalArgumentException("fields and columns have different sizes.");
+        }
+
+        validateLogos();
+    }
+
+    /**
+     * Método que encontra o primeiro logo existente no arquivo de imagens
+     */
+    private void validateLogos() {
+
+        // Caso a operação tenha logos por área
+        for (String logoName : logos) {
+            // Adiciona extensão apenas para procurar o arquivo
+            String fullLogoName = logoName + ".png";
+            File logoFile = new File(IMAGES_PATH + fullLogoName);
+            if (logoFile.exists() && logoFile.isFile()) {
+                // Adiciona o name original pois a extensão é adicionado depois
+                this.logoImage = logoName;
+                break;
+            }
+        }
+    }
+
+    private void createCoverPage() throws Exception {
+        log("CreatedInstance");
+        reportCreateInstance();
+        log("Configure");
+        reportConfigure();
+        this.report.setDataSource(new JREmptyDataSource());
+        log("Createinfopage");
+        reportCreateInfoPage();
+        log("covert to file");
+        reportToFile();
+        log("done");
+    }
+
+    private void createReport() throws IOException, DRException, Exception {
+        log("CreatedInstance");
+        reportCreateInstance();
+        log("ReceiptData");
+        reportReceiptData();
+        log("Configure");
+        reportConfigure();
+        log("CreateDefailHeader");
+        createReportDetailHeader();
+        log("CreateColumns");
+        reportCreateColumns();
+        log("to file");
+        reportToFile();
+        log("done");
     }
 
     private void reportCreateInstance() {
         this.report = DynamicReports.report();
     }
 
-    private void reportReceiptData()
-            throws JRException, DRException {
-        this.report.setStartPageNumber(Integer.valueOf(this.startPage));
+    private void reportReceiptData() throws JRException, DRException {
+        this.report.setStartPageNumber(this.startPage);
         JsonDataSource jsonDataSource = new JsonDataSource(System.in);
         this.report.setDataSource(jsonDataSource);
-    }
-
-    private static void log(String msg)
-            throws IOException {
     }
 
     private int getDefaultColumnWidth(int totalColumns, List<JSONObject> columns) {
@@ -208,14 +216,10 @@ public class MainClass {
         int accumWidth = 0;
         for (int i = 0; i < totalColumns; i++) {
             JSONObject column = (JSONObject) columns.get(i);
-            try {
-                log(column.toJSONString());
-            } catch (IOException ex) {
-                java.util.logging.Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            log(column.toJSONString());
             Object width = column.get("width");
             if (width != null) {
-                accumWidth += new Integer(String.valueOf(width)).intValue();
+                accumWidth += Integer.parseInt(width.toString());
                 numColumnsWithWidth++;
             }
         }
@@ -227,14 +231,10 @@ public class MainClass {
         double accumWidthInPixels = mmToPixel(accumWidth);
 
         int defaultWidth = new Double((pageWithoutMargins - accumWidthInPixels) / (totalColumns - numColumnsWithWidth)).intValue();
-        try {
-            log(String.valueOf(PageType.A4.getHeight()));
-            log(String.valueOf(accumWidthInPixels));
-            log(String.valueOf(pageWithoutMargins));
-            log(String.valueOf(defaultWidth));
-        } catch (IOException ex) {
-            java.util.logging.Logger.getLogger(MainClass.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        log(String.valueOf(PageType.A4.getHeight()));
+        log(String.valueOf(accumWidthInPixels));
+        log(String.valueOf(pageWithoutMargins));
+        log(String.valueOf(defaultWidth));
         return defaultWidth;
     }
 
@@ -243,12 +243,12 @@ public class MainClass {
         return pixelsPerMM * mm;
     }
 
-    private void reportCreateColumns()
-            throws DRException {
+    private void reportCreateColumns() throws DRException, MalformedURLException {
         int cont = 0;
         DynamicReports.margin().getMargin().getTop();
         int size = this.extractFields.size();
         int defaultWidth = getDefaultColumnWidth(size, this.tableColumnName);
+
         while (cont < size) {
             JSONObject column = (JSONObject) this.tableColumnName.get(cont);
             String label = (String) column.get("label");
@@ -256,19 +256,18 @@ public class MainClass {
             Object widthParam = column.get("width");
             Integer width = null;
             if (widthParam == null) {
-                width = Integer.valueOf(defaultWidth);
+                width = defaultWidth;
             } else {
                 width = Integer.valueOf(new Double(mmToPixel(Integer.valueOf(String.valueOf(widthParam)).intValue())).intValue());
             }
-            
-            this.report.columns(new ColumnBuilder[]{
-                DynamicReports.col
-                .column(label, (String) this.extractFields.get(cont), DataTypes.stringType())
-                .setFixedWidth(width)
-                .setStretchWithOverflow(Boolean.valueOf(false))
-                .setStyle(getAlignmentStyle(align))
-            });
 
+            this.report.columns(
+                    DynamicReports.col
+                    .column(label, this.extractFields.get(cont), DataTypes.stringType())
+                    .setFixedWidth(width)
+                    .setStretchWithOverflow(false)
+                    .setStyle(getAlignmentStyle(align))
+            );
             cont++;
         }
     }
@@ -282,56 +281,55 @@ public class MainClass {
                 align = HorizontalAlignment.RIGHT;
             }
         }
-        return (StyleBuilder) ((StyleBuilder) ((StyleBuilder) Styles.style().setHorizontalAlignment(align)).setLeftPadding(Integer.valueOf(2))).setRightPadding(Integer.valueOf(2));
+
+        return Styles.style().setHorizontalAlignment(align).setLeftPadding(2).setRightPadding(2);
     }
 
     private void reportConfigure() {
         this.report.setPageFormat(PageType.A4, PageOrientation.LANDSCAPE);
 
-        this.report.setTemplate(this.templateDefault);
+        this.report.setTemplate(new TemplateDefault());
         HyperLinkComponentBuilder creationTime;
         if (this.created == null) {
             creationTime = Components.currentDate().setPattern("dd/MM/yyyy HH:mm:ss").setHorizontalAlignment(HorizontalAlignment.RIGHT);
         } else {
             creationTime = DynamicReports.cmp.text(this.created).setHorizontalAlignment(HorizontalAlignment.RIGHT);
         }
-        HorizontalListBuilder footerList = DynamicReports.cmp.horizontalList(new ComponentBuilder[]{DynamicReports.cmp
-            .text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
-            Components.pageNumber().setHorizontalAlignment(HorizontalAlignment.CENTER), creationTime});
+        HorizontalListBuilder footerList = DynamicReports.cmp.horizontalList(
+                DynamicReports.cmp.text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
+                Components.pageNumber().setHorizontalAlignment(HorizontalAlignment.CENTER),
+                creationTime
+        );
 
-        this.report.pageFooter(new ComponentBuilder[]{footerList});
+        this.report.pageFooter(footerList);
     }
 
-    private void reportCreateInfoPage()
-            throws MalformedURLException, Exception {
+    private void reportCreateInfoPage() throws Exception {
         HorizontalListBuilder horizontalList = DynamicReports.cmp.horizontalList();
-        horizontalList.setStyle(DynamicReports.stl.style(Integer.valueOf(10)));
+        horizontalList.setStyle(DynamicReports.stl.style(10));
 
         ComponentBuilder<?, ?> compFilters = createFiltersComponent("Filtros Utilizados");
         ComponentBuilder<?, ?> compGroups = createGroupsComponent("Grupos (Top 10)");
         ComponentBuilder<?, ?> compSum = createSumComponent("Totais");
         if (compFilters != null) {
-            horizontalList.add(new HorizontalListCellBuilder[]{DynamicReports.cmp.hListCell(compFilters).heightFixedOnTop()});
+            horizontalList.add(DynamicReports.cmp.hListCell(compFilters).heightFixedOnTop());
         }
         if (compGroups != null) {
-            horizontalList.add(new HorizontalListCellBuilder[]{DynamicReports.cmp.hListCell(compGroups).heightFixedOnTop()});
+            horizontalList.add(DynamicReports.cmp.hListCell(compGroups).heightFixedOnTop());
         }
         if (compSum != null) {
-            horizontalList.add(new HorizontalListCellBuilder[]{DynamicReports.cmp.hListCell(compSum).heightFixedOnTop()});
+            horizontalList.add(DynamicReports.cmp.hListCell(compSum).heightFixedOnTop());
         }
-        this.report.title(new ComponentBuilder[]{
-            createTitleComponent(this.reportTitle), horizontalList, DynamicReports.cmp
-            .verticalGap(10)});
+
+        this.report.title(createCoverHeaderComponent(), horizontalList, DynamicReports.cmp.verticalGap(10));
     }
 
-    private void reportToFile()
-            throws DRException, JRException {
+    private void reportToFile() throws DRException, JRException {
         JasperPdfExporterBuilder pdfExporter = DynamicReports.export.pdfExporter(System.out);
         this.report.toPdf(pdfExporter);
     }
 
-    private ComponentBuilder<?, ?> createFiltersComponent(String label)
-            throws IOException {
+    private ComponentBuilder<?, ?> createFiltersComponent(String label) throws IOException {
         if ((this.filters != null) && (!this.filters.isEmpty())) {
             List<String> andConditions = (List) this.filters.get("and");
             List<String> orConditions = (List) this.filters.get("or");
@@ -340,28 +338,26 @@ public class MainClass {
             HorizontalListBuilder card = createCardComponent();
             VerticalListBuilder verticalList = DynamicReports.cmp.verticalList();
             if ((orConditions != null) && (!orConditions.isEmpty())) {
-                verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("Ao menos uma condi����o atendida:").setStyle(TemplateDefault.boldStyleFont10)});
+                verticalList.add(DynamicReports.cmp.text("Ao menos uma condição atendida:").setStyle(TemplateDefault.boldStyleFont10));
                 for (String extractField : orConditions) {
-                    verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp())});
+                    verticalList.add(DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp()));
                 }
             }
             if ((andConditions != null) && (!andConditions.isEmpty())) {
-                verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("Todas as condi����es atendidas:").setStyle(TemplateDefault.boldStyleFont10)});
+                verticalList.add(DynamicReports.cmp.text("Todas as condições atendidas:").setStyle(TemplateDefault.boldStyleFont10));
                 for (String extractField : andConditions) {
-                    verticalList.add(new ComponentBuilder[]{DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp())});
+                    verticalList.add(DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp()));
                 }
             }
-            card.add(new ComponentBuilder[]{verticalList});
-            superList.add(new ComponentBuilder[]{card});
+            card.add(verticalList);
+            superList.add(card);
 
-            return DynamicReports.cmp.verticalList(new ComponentBuilder[]{DynamicReports.cmp
-                .text(label).setStyle(TemplateDefault.boldStyle), superList});
+            return DynamicReports.cmp.verticalList(DynamicReports.cmp.text(label).setStyle(TemplateDefault.boldStyle), superList);
         }
         return null;
     }
 
-    private ComponentBuilder<?, ?> createGroupsComponent(String label)
-            throws IOException {
+    private ComponentBuilder<?, ?> createGroupsComponent(String label) throws IOException {
         if ((this.aggregations != null) && (this.aggregations.containsKey("group"))) {
             JSONArray groups = (JSONArray) this.aggregations.get("group");
             if ((groups != null) && (!groups.isEmpty())) {
@@ -374,7 +370,7 @@ public class MainClass {
                     JSONArray group = (JSONArray) groupField.get(key);
 
                     VerticalListBuilder content = DynamicReports.cmp.verticalList();
-                    content.add(new ComponentBuilder[]{DynamicReports.cmp.text(key)});
+                    content.add(DynamicReports.cmp.text(key));
                     for (Object segmentObj : group) {
                         String groupText = "";
 
@@ -397,21 +393,19 @@ public class MainClass {
                             }
                             groupText = groupText + ")";
 
-                            content.add(new ComponentBuilder[]{DynamicReports.cmp.text(groupText).setStyle(getStyleMarkedUp())});
+                            content.add(DynamicReports.cmp.text(groupText).setStyle(getStyleMarkedUp()));
                         }
                     }
-                    cardComponent.add(new ComponentBuilder[]{content});
-                    listSuper.add(new ComponentBuilder[]{cardComponent});
+                    cardComponent.add(content);
+                    listSuper.add(cardComponent);
                 }
-                return DynamicReports.cmp.verticalList(new ComponentBuilder[]{DynamicReports.cmp
-                    .text(label).setStyle(TemplateDefault.boldStyle), listSuper});
+                return DynamicReports.cmp.verticalList(DynamicReports.cmp.text(label).setStyle(TemplateDefault.boldStyle), listSuper);
             }
         }
         return null;
     }
 
-    private ComponentBuilder<?, ?> createSumComponent(String label)
-            throws Exception {
+    private ComponentBuilder<?, ?> createSumComponent(String label) throws Exception {
         if ((this.aggregations != null) && (this.aggregations.containsKey("sum"))) {
             JSONArray sumArray = (JSONArray) this.aggregations.get("sum");
             if ((sumArray != null) && (!sumArray.isEmpty())) {
@@ -427,29 +421,28 @@ public class MainClass {
 
                     String value = sumField.get(key).toString();
 
-                    labelSum.add(new ComponentBuilder[]{DynamicReports.cmp.text("<b>" + key + "</b>: " + value).setStyle(getStyleMarkedUp())});
-                    content.add(new ComponentBuilder[]{labelSum});
+                    labelSum.add(DynamicReports.cmp.text("<b>" + key + "</b>: " + value).setStyle(getStyleMarkedUp()));
+                    content.add(labelSum);
 
-                    cardComponent.add(new ComponentBuilder[]{content});
+                    cardComponent.add(content);
 
-                    listSuper.add(new ComponentBuilder[]{cardComponent});
+                    listSuper.add(cardComponent);
                 }
-                return DynamicReports.cmp.verticalList(new ComponentBuilder[]{DynamicReports.cmp
-                    .text(label).setStyle(TemplateDefault.boldStyle), listSuper});
+                return DynamicReports.cmp.verticalList(DynamicReports.cmp.text(label).setStyle(TemplateDefault.boldStyle), listSuper);
             }
         }
         return null;
     }
 
     private HorizontalListBuilder createCardComponent() {
-        HorizontalListBuilder cardComponent = DynamicReports.cmp.horizontalList().setBaseStyle((ReportStyleBuilder) DynamicReports.stl.style().setLeftPadding(Integer.valueOf(5)));
+        HorizontalListBuilder cardComponent = DynamicReports.cmp.horizontalList().setBaseStyle(DynamicReports.stl.style().setLeftPadding(5));
         cardComponent.setStyle(this.cardStyle);
         return cardComponent;
     }
 
     private void createCardStyle() {
         PenBuilder pen1Point = DynamicReports.stl.pen1Point().setLineColor(Color.white);
-        this.cardStyle = ((StyleBuilder) DynamicReports.stl.style(pen1Point).setPadding(Integer.valueOf(10)));
+        this.cardStyle = DynamicReports.stl.style(pen1Point).setPadding(10);
         this.cardStyle.setBackgroundColor(new Color(224, 224, 224));
     }
 
@@ -457,31 +450,105 @@ public class MainClass {
         return (StyleBuilder) DynamicReports.stl.style().setMarkup(Markup.STYLED);
     }
 
-    private ComponentBuilder<?, ?> createTitleComponent(String label)
-            throws MalformedURLException {
-        URL logo = new URL("http://static-files04.cdnandroid.com/76/43/3e/08/imagen-rotativo-rondon-0thumb.jpg");
-        String urlOperacao = "https://rondonopolis.s2way.com/";
-        HyperLinkBuilder link = DynamicReports.hyperLink(urlOperacao);
+    /**
+     * Monta HEADER da página de capa
+     *
+     * @param label
+     * @return
+     * @throws MalformedURLException
+     */
+    private ComponentBuilder<?, ?> createCoverHeaderComponent() throws MalformedURLException {
+        
+        // Instância do logo, caso exista
+        final ImageBuilder logoComponent = getLogoComponent();
 
-        JRHyperlinkListener a = new JRHyperlinkListener() {
-            public void gotoHyperlink(JRPrintHyperlink jrph)
-                    throws JRException {
-                try {
-                    Desktop.getDesktop().browse(new URI(jrph.getHyperlinkAnchor()));
-                } catch (Exception localException) {
-                }
-            }
-        };
-        ComponentBuilder<?, ?> dynamicReportsComponent = DynamicReports.cmp.horizontalList(new ComponentBuilder[]{
-            ((TextFieldBuilder) DynamicReports.cmp.text(this.reportTitle).setStyle(TemplateDefault.bold22CenteredStyle)).setHorizontalAlignment(HorizontalAlignment.LEFT), DynamicReports.cmp
-            .text("Total de Registros: " + this.totalRows).setStyle(TemplateDefault.testecapiroto)});
+        // Cria componente do logo e titulo do relatório
+        final HorizontalListBuilder leftTitleData = DynamicReports.cmp.horizontalList();
+        // Só adiciona logo, se o mesmo existir
+        if (logoComponent != null) {
+            leftTitleData.add(DynamicReports.cmp.verticalList(logoComponent.setStyle(TemplateDefault.verticalCenterAligment)));
+            leftTitleData.add(DynamicReports.cmp.gap(10, 0));
+        }
+        // Adiciona título do relatório
+        leftTitleData.add(DynamicReports.cmp.text(this.reportTitle).setStyle(TemplateDefault.bold22TitleStyle));
 
-        return DynamicReports.cmp.horizontalList().add(new ComponentBuilder[]{dynamicReportsComponent}).newRow().add(new ComponentBuilder[]{DynamicReports.cmp.line()}).newRow().add(new ComponentBuilder[]{DynamicReports.cmp.verticalGap(10)});
+        // Cria componente que indica total de registros
+        final TextFieldBuilder<String> rightTitleData = DynamicReports.cmp.text("Total de Registros: " + this.totalRows)
+                .setHorizontalAlignment(HorizontalAlignment.RIGHT)
+                .setStyle(TemplateDefault.verticalBottomAligment);
+
+        // Retorna componente com o título completo
+        return DynamicReports.cmp.horizontalList()
+                .add(leftTitleData, rightTitleData)
+                .newRow()
+                .add(DynamicReports.cmp.gap(10, 10))
+                .newRow()
+                .add(DynamicReports.cmp.line())
+                .newRow()
+                .add(DynamicReports.cmp.verticalGap(10));
     }
 
-    private void addCustomerAttribute(HorizontalListBuilder list, String label, String value) {
-        if (value != null) {
-            list.add(new ComponentBuilder[]{DynamicReports.cmp.text(label + ":").setFixedColumns(Integer.valueOf(10)).setStyle(TemplateDefault.boldStyleFont10), DynamicReports.cmp.text(value)}).newRow();
+    /**
+     * Monta HEADER das páginas de dados
+     *
+     * @throws MalformedURLException
+     */
+    private void createReportDetailHeader() throws MalformedURLException {
+
+        final ImageBuilder logoComponent = getLogoComponent();
+
+        // Caso exista logo, deverá adicionar. Caso contrário, não deverá adicionar o padding na página de dados
+        if (logoComponent != null) {
+            final HorizontalListBuilder horizontalList = DynamicReports.cmp.horizontalList(
+                    DynamicReports.cmp.text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
+                    logoComponent.setHorizontalAlignment(HorizontalAlignment.CENTER),
+                    DynamicReports.cmp.text("").setHorizontalAlignment(HorizontalAlignment.RIGHT)
+            ).newRow().add(DynamicReports.cmp.verticalGap(10));
+
+            this.report.pageHeader(horizontalList);
         }
     }
+
+    /**
+     * Retorna componente de imagem do logo da operação
+     *
+     * Exemplo para caso queira logo da web URL logo = new
+     * URL("http://www.imagemdaweb.com.br/imagem,png"); final ImageBuilder image
+     * = DynamicReports.cmp.image(logo);
+     *
+     * @return
+     * @throws MalformedURLException
+     */
+    private ImageBuilder getLogoComponent() throws MalformedURLException {
+
+        log("dentro get logo");
+        // Caso operação não use logo
+        if (this.logoImage == null) {
+            log("null");
+            return null;
+        }
+        log("fora");
+
+        final ImageBuilder image = DynamicReports.cmp.image(IMAGES_PATH + this.logoImage + ".png");
+        // Seta tamanho default
+        image.setFixedDimension(60, 60);
+        // Vincula url (caso tenha sido passado) ao logo
+        if (this.hyperlinkLogo != null && !this.hyperlinkLogo.isEmpty()) {
+            image.setHyperLink(DynamicReports.hyperLink(this.hyperlinkLogo));
+        }
+        return image;
+    }
+
+    private static void log(Throwable e) {
+        logger.info("paaah!", e);
+    }
+
+    /**
+     * Este método serve apenas para debugar. Quando for versão oficial, deverá
+     * comentá-lo.
+     */
+    private static void log(String msg) {
+//        logger.info(msg);
+    }
+
 }
