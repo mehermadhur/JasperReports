@@ -158,6 +158,10 @@ public class MainClass {
      * Método que encontra o primeiro logo existente no arquivo de imagens
      */
     private void validateLogos() {
+        
+        if (logos == null) {
+            return;
+        }
 
         // Caso a operação tenha logos por área
         for (String logoName : logos) {
@@ -540,7 +544,7 @@ public class MainClass {
     }
 
     private static void log(Throwable e) {
-        logger.info("paaah!", e);
+//        logger.info("paaah!", e);
     }
 
     /**
