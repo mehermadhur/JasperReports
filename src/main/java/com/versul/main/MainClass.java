@@ -210,7 +210,7 @@ public class MainClass {
     }
 
     private void reportReceiptData() throws JRException, DRException {
-        this.report.setStartPageNumber(this.startPage);
+//        this.report.setStartPageNumber(this.startPage);
         JsonDataSource jsonDataSource = new JsonDataSource(System.in);
         this.report.setDataSource(jsonDataSource);
     }
@@ -301,7 +301,7 @@ public class MainClass {
         }
         HorizontalListBuilder footerList = DynamicReports.cmp.horizontalList(
                 DynamicReports.cmp.text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
-                Components.pageNumber().setHorizontalAlignment(HorizontalAlignment.CENTER),
+//                Components.pageNumber().setHorizontalAlignment(HorizontalAlignment.CENTER),
                 creationTime
         );
 
