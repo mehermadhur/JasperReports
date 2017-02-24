@@ -46,7 +46,6 @@ public class MainClass {
     private JasperReportBuilder report = null;
     private StyleBuilder cardStyle;
     private long totalRows;
-    private String reportName;
     private String reportTitle;
     private List<String> extractFields;
     private List<JSONObject> tableColumnName;
@@ -89,17 +88,12 @@ public class MainClass {
     private void extractAndValidateCoverParams(String jsonArgs) throws ParseException {
         JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
 
-        Object reportNameObject = arguments.get("report_name");
         Object reportTitleObject = arguments.get("report_title");
-        if (reportNameObject == null) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
         if (reportTitleObject == null) {
             throw new IllegalArgumentException("'report_title' argument is invalid");
         }
         this.hyperlinkLogo = arguments.get("logo_hyperlink") == null ? "" : arguments.get("logo_hyperlink").toString();
         this.logos = ((JSONArray) arguments.get("logo"));
-        this.reportName = reportNameObject.toString();
         this.reportTitle = reportTitleObject.toString();
         this.extractFields = ((JSONArray) arguments.get("fields"));
         this.tableColumnName = ((JSONArray) arguments.get("columns"));
@@ -108,9 +102,6 @@ public class MainClass {
         this.totalRows = Long.parseLong(arguments.get("count").toString());
         this.created = ((String) arguments.get("created"));
         this.startPage = 1;
-        if (this.reportName.isEmpty()) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
         if (this.reportTitle.isEmpty()) {
             throw new IllegalArgumentException("'report_title' argument is invalid");
         }
@@ -130,20 +121,12 @@ public class MainClass {
     private void extractAndValidateReportParams(String jsonArgs) throws ParseException {
         JSONObject arguments = (JSONObject) this.parser.parse(jsonArgs);
 
-        Object reportNameObject = arguments.get("report_name");
-        if (reportNameObject == null) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
         this.hyperlinkLogo = arguments.get("logo_hyperlink") == null ? "" : arguments.get("logo_hyperlink").toString();
         this.logos = ((JSONArray) arguments.get("logo"));
-        this.reportName = reportNameObject.toString();
         this.extractFields = ((JSONArray) arguments.get("fields"));
         this.tableColumnName = ((JSONArray) arguments.get("columns"));
         this.created = ((String) arguments.get("created"));
         this.startPage = Integer.parseInt(arguments.get("page").toString());
-        if (this.reportName.isEmpty()) {
-            throw new IllegalArgumentException("'report_name' argument is invalid");
-        }
         if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
             throw new IllegalArgumentException("'columns' argument is invalid");
         }
