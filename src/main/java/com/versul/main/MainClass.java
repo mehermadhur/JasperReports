@@ -49,10 +49,9 @@ public class MainClass {
     private String reportTitle;
     private List<String> extractFields;
     private List<JSONObject> tableColumnName;
-    private JSONObject filters;
+    private List<String> filters;
     private JSONObject aggregations;
     private String created;
-    private int startPage;
     private List<String> logos;
     private String hyperlinkLogo;
     private final String IMAGES_PATH = "../images/";
@@ -95,25 +94,13 @@ public class MainClass {
         this.hyperlinkLogo = arguments.get("logo_hyperlink") == null ? "" : arguments.get("logo_hyperlink").toString();
         this.logos = ((JSONArray) arguments.get("logo"));
         this.reportTitle = reportTitleObject.toString();
-        this.extractFields = ((JSONArray) arguments.get("fields"));
-        this.tableColumnName = ((JSONArray) arguments.get("columns"));
-        this.filters = ((JSONObject) arguments.get("filters"));
+        this.filters = ((List) arguments.get("filters"));
         this.aggregations = ((JSONObject) arguments.get("aggs"));
         this.totalRows = Long.parseLong(arguments.get("count").toString());
         this.created = ((String) arguments.get("created"));
-        this.startPage = 1;
         if (this.reportTitle.isEmpty()) {
             throw new IllegalArgumentException("'report_title' argument is invalid");
-        }
-        if ((this.extractFields == null) || (this.extractFields.isEmpty())) {
-            throw new IllegalArgumentException("'fields' argument is invalid");
-        }
-        if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
-            throw new IllegalArgumentException("'columns' argument is invalid");
-        }
-        if (this.extractFields.size() != this.tableColumnName.size()) {
-            throw new IllegalArgumentException("fields and columns have different sizes.");
-        }
+        }       
 
         validateLogos();
     }
@@ -126,7 +113,6 @@ public class MainClass {
         this.extractFields = ((JSONArray) arguments.get("fields"));
         this.tableColumnName = ((JSONArray) arguments.get("columns"));
         this.created = ((String) arguments.get("created"));
-        this.startPage = Integer.parseInt(arguments.get("page").toString());
         if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
             throw new IllegalArgumentException("'columns' argument is invalid");
         }
@@ -141,7 +127,7 @@ public class MainClass {
      * Método que encontra o primeiro logo existente no arquivo de imagens
      */
     private void validateLogos() {
-        
+
         if (logos == null) {
             return;
         }
@@ -193,7 +179,6 @@ public class MainClass {
     }
 
     private void reportReceiptData() throws JRException, DRException {
-        this.report.setStartPageNumber(this.startPage);
         JsonDataSource jsonDataSource = new JsonDataSource(System.in);
         this.report.setDataSource(jsonDataSource);
     }
@@ -284,7 +269,6 @@ public class MainClass {
         }
         HorizontalListBuilder footerList = DynamicReports.cmp.horizontalList(
                 DynamicReports.cmp.text("").setHorizontalAlignment(HorizontalAlignment.LEFT),
-                Components.pageNumber().setHorizontalAlignment(HorizontalAlignment.CENTER),
                 creationTime
         );
 
@@ -318,24 +302,14 @@ public class MainClass {
 
     private ComponentBuilder<?, ?> createFiltersComponent(String label) throws IOException {
         if ((this.filters != null) && (!this.filters.isEmpty())) {
-            List<String> andConditions = (List) this.filters.get("and");
-            List<String> orConditions = (List) this.filters.get("or");
-
             HorizontalListBuilder superList = DynamicReports.cmp.horizontalList();
             HorizontalListBuilder card = createCardComponent();
             VerticalListBuilder verticalList = DynamicReports.cmp.verticalList();
-            if ((orConditions != null) && (!orConditions.isEmpty())) {
-                verticalList.add(DynamicReports.cmp.text("Ao menos uma condição atendida:").setStyle(TemplateDefault.boldStyleFont10));
-                for (String extractField : orConditions) {
-                    verticalList.add(DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp()));
-                }
+
+            for (String filter : this.filters) {
+                verticalList.add(DynamicReports.cmp.text("    " + filter).setStyle(getStyleMarkedUp()));
             }
-            if ((andConditions != null) && (!andConditions.isEmpty())) {
-                verticalList.add(DynamicReports.cmp.text("Todas as condições atendidas:").setStyle(TemplateDefault.boldStyleFont10));
-                for (String extractField : andConditions) {
-                    verticalList.add(DynamicReports.cmp.text("    " + extractField).setStyle(getStyleMarkedUp()));
-                }
-            }
+            
             card.add(verticalList);
             superList.add(card);
 
@@ -445,7 +419,7 @@ public class MainClass {
      * @throws MalformedURLException
      */
     private ComponentBuilder<?, ?> createCoverHeaderComponent() throws MalformedURLException {
-        
+
         // Instância do logo, caso exista
         final ImageBuilder logoComponent = getLogoComponent();
 
