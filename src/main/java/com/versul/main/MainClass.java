@@ -54,7 +54,7 @@ public class MainClass {
     private String created;
     private List<String> logos;
     private String hyperlinkLogo;
-    private final String IMAGES_PATH = "../images/";
+    private final String IMAGES_PATH = "images/";
     private String logoImage = null;
 
     public MainClass() {
