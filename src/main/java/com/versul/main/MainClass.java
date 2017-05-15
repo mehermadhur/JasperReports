@@ -33,6 +33,7 @@ import net.sf.dynamicreports.report.exception.DRException;
 import net.sf.jasperreports.engine.JREmptyDataSource;
 import net.sf.jasperreports.engine.JRException;
 import net.sf.jasperreports.engine.data.JsonDataSource;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -307,7 +308,7 @@ public class MainClass {
             VerticalListBuilder verticalList = DynamicReports.cmp.verticalList();
 
             for (String filter : this.filters) {
-                verticalList.add(DynamicReports.cmp.text("    " + filter).setStyle(getStyleMarkedUp()));
+                verticalList.add(DynamicReports.cmp.text("    " + StringEscapeUtils.escapeXml(filter)).setStyle(getStyleMarkedUp()));
             }
             
             card.add(verticalList);
