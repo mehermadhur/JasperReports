@@ -42,11 +42,13 @@ import org.json.simple.parser.ParseException;
 
 public class MainClass {
 
+    private final int DEFAULT_BODY_FONT_SIZE = 8;
     private static Logger logger = Logger.getLogger(MainClass.class);
     private final JSONParser parser = new JSONParser();
     private JasperReportBuilder report = null;
     private StyleBuilder cardStyle;
     private long totalRows;
+    private int bodyFontSize;
     private String reportTitle;
     private List<String> extractFields;
     private List<JSONObject> tableColumnName;
@@ -98,10 +100,12 @@ public class MainClass {
         this.filters = ((List) arguments.get("filters"));
         this.aggregations = ((JSONObject) arguments.get("aggs"));
         this.totalRows = Long.parseLong(arguments.get("count").toString());
+        this.bodyFontSize = arguments.containsKey("body_font_size") ? Integer.parseInt(arguments.get("body_font_size").toString()) : DEFAULT_BODY_FONT_SIZE;
+
         this.created = ((String) arguments.get("created"));
         if (this.reportTitle.isEmpty()) {
             throw new IllegalArgumentException("'report_title' argument is invalid");
-        }       
+        }
 
         validateLogos();
     }
@@ -255,7 +259,7 @@ public class MainClass {
             }
         }
 
-        return Styles.style().setHorizontalAlignment(align).setLeftPadding(2).setRightPadding(2);
+        return Styles.style().setHorizontalAlignment(align).setLeftPadding(2).setRightPadding(2).setFontSize(this.bodyFontSize);
     }
 
     private void reportConfigure() {
@@ -310,7 +314,7 @@ public class MainClass {
             for (String filter : this.filters) {
                 verticalList.add(DynamicReports.cmp.text("    " + StringEscapeUtils.escapeXml(filter)).setStyle(getStyleMarkedUp()));
             }
-            
+
             card.add(verticalList);
             superList.add(card);
 
