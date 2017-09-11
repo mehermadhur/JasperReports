@@ -100,8 +100,6 @@ public class MainClass {
         this.filters = ((List) arguments.get("filters"));
         this.aggregations = ((JSONObject) arguments.get("aggs"));
         this.totalRows = Long.parseLong(arguments.get("count").toString());
-        this.bodyFontSize = arguments.containsKey("body_font_size") ? Integer.parseInt(arguments.get("body_font_size").toString()) : DEFAULT_BODY_FONT_SIZE;
-
         this.created = ((String) arguments.get("created"));
         if (this.reportTitle.isEmpty()) {
             throw new IllegalArgumentException("'report_title' argument is invalid");
@@ -118,6 +116,7 @@ public class MainClass {
         this.extractFields = ((JSONArray) arguments.get("fields"));
         this.tableColumnName = ((JSONArray) arguments.get("columns"));
         this.created = ((String) arguments.get("created"));
+        this.bodyFontSize = arguments.containsKey("body_font_size") ? Integer.parseInt(arguments.get("body_font_size").toString()) : DEFAULT_BODY_FONT_SIZE;
         if ((this.tableColumnName == null) || (this.tableColumnName.isEmpty())) {
             throw new IllegalArgumentException("'columns' argument is invalid");
         }
